@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI News Summarizer Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #f0c040;
+    --accent2: #e05a2b;
+    --text: #e8e8f0;
+    --muted: #5a5a72;
+    --green: #2ecc71;
+    --red: #e74c3c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(240,192,64,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(240,192,64,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 48px;
+    animation: fadeDown 0.6s ease both;
+  }
+
+  .logo-area h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.6rem;
+    font-weight: 900;
+    color: var(--accent);
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+
+  .logo-area p {
+    color: var(--muted);
+    font-size: 0.75rem;
+    margin-top: 6px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    border-radius: 100px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  /* Cards grid */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    animation: fadeUp 0.6s ease both;
+    transition: border-color 0.3s ease;
+  }
+
+  .card:hover { border-color: rgba(240,192,64,0.3); }
+  .card:nth-child(1) { animation-delay: 0.1s; }
+  .card:nth-child(2) { animation-delay: 0.2s; }
+
+  .card-label {
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-label::before {
+    content: '';
+    display: block;
+    width: 20px;
+    height: 1px;
+    background: var(--accent);
+  }
+
+  /* RSS Source Selector */
+  .source-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .source-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.78rem;
+  }
+
+  .source-item:hover {
+    border-color: var(--accent);
+    background: rgba(240,192,64,0.05);
+  }
+
+  .source-item.active {
+    border-color: var(--accent);
+    background: rgba(240,192,64,0.08);
+    color: var(--accent);
+  }
+
+  .source-item .source-name { font-weight: 500; }
+  .source-item .source-url { color: var(--muted); font-size: 0.65rem; margin-top: 2px; }
+
+  .source-check {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .source-item.active .source-check {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+  }
+
+  /* Custom RSS input */
+  .custom-input-area {
+    margin-top: 14px;
+    display: flex;
+    gap: 8px;
+  }
+
+  input[type="text"] {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="text"]:focus { border-color: var(--accent); }
+  input[type="text"]::placeholder { color: var(--muted); }
+
+  .btn-small {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-small:hover { background: #ffd060; transform: translateY(-1px); }
+
+  /* Schedule info */
+  .schedule-display {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .schedule-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.78rem;
+  }
+
+  .schedule-item:last-child { border-bottom: none; }
+  .schedule-item .label { color: var(--muted); }
+  .schedule-item .value { color: var(--accent); }
+
+  /* Trigger button - full width */
+  .trigger-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    animation: fadeUp 0.6s 0.3s ease both;
+    transition: border-color 0.3s;
+  }
+
+  .trigger-card:hover { border-color: rgba(240,192,64,0.3); }
+
+  .trigger-info h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .trigger-info p {
+    font-size: 0.72rem;
+    color: var(--muted);
+    max-width: 400px;
+    line-height: 1.6;
+  }
+
+  .btn-trigger {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 12px;
+    padding: 16px 36px;
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .btn-trigger::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .btn-trigger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(240,192,64,0.35);
+  }
+
+  .btn-trigger:hover::before { opacity: 1; }
+
+  .btn-trigger:active { transform: translateY(0); }
+
+  .btn-trigger.loading {
+    background: var(--muted);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .btn-trigger.success { background: var(--green); }
+  .btn-trigger.error { background: var(--red); }
+
+  /* News digest output */
+  .digest-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    animation: fadeUp 0.6s 0.4s ease both;
+    transition: border-color 0.3s;
+  }
+
+  .digest-card:hover { border-color: rgba(240,192,64,0.3); }
+
+  .digest-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .digest-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+
+  .digest-empty .icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    opacity: 0.4;
+  }
+
+  .digest-empty p {
+    font-size: 0.78rem;
+    line-height: 1.7;
+  }
+
+  .digest-content {
+    display: none;
+  }
+
+  .digest-content.visible { display: block; }
+
+  .news-item {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .news-item:last-child { border-bottom: none; }
+
+  .news-item h4 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    color: var(--text);
+    margin-bottom: 6px;
+    line-height: 1.4;
+  }
+
+  .news-item p {
+    font-size: 0.74rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .news-item .tag {
+    display: inline-block;
+    background: rgba(240,192,64,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(240,192,64,0.2);
+    padding: 2px 10px;
+    border-radius: 100px;
+    font-size: 0.62rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  /* Log terminal */
+  .log-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 24px;
+    animation: fadeUp 0.6s 0.5s ease both;
+  }
+
+  .log-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .log-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .log-dot.red { background: #e74c3c; }
+  .log-dot.yellow { background: #f0c040; }
+  .log-dot.green { background: #2ecc71; }
+
+  .log-entries {
+    font-size: 0.72rem;
+    line-height: 2;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+
+  .log-entry { display: flex; gap: 12px; }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-msg.info { color: #7ec8e3; }
+  .log-msg.success { color: var(--green); }
+  .log-msg.error { color: var(--red); }
+  .log-msg.warn { color: var(--accent); }
+
+  /* Animations */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0,0,0,0.3);
+    border-top-color: #000;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  /* n8n webhook config notice */
+  .webhook-notice {
+    background: rgba(240,192,64,0.06);
+    border: 1px solid rgba(240,192,64,0.2);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-bottom: 24px;
+    line-height: 1.7;
+    animation: fadeUp 0.6s 0.05s ease both;
+  }
+
+  .webhook-notice span { color: var(--accent); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-area">
+      <h1>🗞️ NewsAI</h1>
+      <p>Automated Intelligence Digest</p>
+    </div>
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      <span>n8n connected</span>
+    </div>
+  </header>
+
+  <!-- Webhook notice -->
+  <div class="webhook-notice">
+    ⚙️ <span>Setup:</span> Add a <span>Webhook Trigger</span> node in n8n and paste its URL in the trigger button below. Also add a second webhook to receive the digest output back here.
+    <br>Current webhook: <span id="webhookUrlDisplay">Not configured — click settings below</span>
+  </div>
+
+  <!-- Webhook URL config -->
+  <div class="card" style="margin-bottom:24px; animation-delay:0.05s;">
+    <div class="card-label">⚡ n8n Webhook URL</div>
+    <div style="display:flex; gap:10px;">
+      <input type="text" id="webhookInput" placeholder="https://your-n8n.com/webhook/xxxx-xxxx" style="flex:1;" />
+      <button class="btn-small" onclick="saveWebhook()">Save</button>
+    </div>
+    <p style="font-size:0.68rem; color:var(--muted); margin-top:10px;">In n8n: replace the Schedule Trigger with a Webhook node → copy its URL here</p>
+  </div>
+
+  <!-- Top Grid: RSS + Schedule -->
+  <div class="grid">
+
+    <!-- RSS Source -->
+    <div class="card">
+      <div class="card-label">📡 RSS Feed Source</div>
+      <div class="source-list" id="sourceList">
+        <div class="source-item active" onclick="selectSource(this, 'https://feeds.bbci.co.uk/news/world/rss.xml')">
+          <div>
+            <div class="source-name">BBC World News</div>
+            <div class="source-url">feeds.bbci.co.uk/news/world</div>
+          </div>
+          <div class="source-check">✓</div>
+        </div>
+        <div class="source-item" onclick="selectSource(this, 'https://feeds.reuters.com/reuters/topNews')">
+          <div>
+            <div class="source-name">Reuters Top News</div>
+            <div class="source-url">feeds.reuters.com/topNews</div>
+          </div>
+          <div class="source-check"></div>
+        </div>
+        <div class="source-item" onclick="selectSource(this, 'https://rss.cnn.com/rss/edition_world.rss')">
+          <div>
+            <div class="source-name">CNN World</div>
+            <div class="source-url">rss.cnn.com/edition_world</div>
+          </div>
+          <div class="source-check"></div>
+        </div>
+        <div class="source-item" onclick="selectSource(this, 'https://feeds.skynews.com/feeds/rss/world.xml')">
+          <div>
+            <div class="source-name">Sky News World</div>
+            <div class="source-url">feeds.skynews.com/world</div>
+          </div>
+          <div class="source-check"></div>
+        </div>
+      </div>
+      <div class="custom-input-area">
+        <input type="text" id="customRss" placeholder="Or paste custom RSS URL..." />
+        <button class="btn-small" onclick="addCustomRSS()">Add</button>
+      </div>
+    </div>
+
+    <!-- Schedule Info -->
+    <div class="card">
+      <div class="card-label">🕐 Schedule & Stats</div>
+      <div class="schedule-display">
+        <div class="schedule-item">
+          <span class="label">Frequency</span>
+          <span class="value">Every 24 hours</span>
+        </div>
+        <div class="schedule-item">
+          <span class="label">Articles fetched</span>
+          <span class="value">10 per run</span>
+        </div>
+        <div class="schedule-item">
+          <span class="label">AI Model</span>
+          <span class="value">llama-3.3-70b</span>
+        </div>
+        <div class="schedule-item">
+          <span class="label">Delivery</span>
+          <span class="value">Telegram Bot</span>
+        </div>
+        <div class="schedule-item">
+          <span class="label">Last run</span>
+          <span class="value" id="lastRun">Never</span>
+        </div>
+        <div class="schedule-item">
+          <span class="label">Total runs</span>
+          <span class="value" id="totalRuns">0</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Trigger Button -->
+  <div class="trigger-card">
+    <div class="trigger-info">
+      <h3>Run News Digest Now</h3>
+      <p>Manually trigger the workflow — fetches latest news, summarizes with AI, and sends to your Telegram instantly.</p>
+    </div>
+    <button class="btn-trigger" id="triggerBtn" onclick="triggerWorkflow()">
+      ▶ Run Now
+    </button>
+  </div>
+
+  <!-- News Digest Output -->
+  <div class="digest-card">
+    <div class="digest-header">
+      <div class="card-label" style="margin-bottom:0;">📰 Live News Digest</div>
+      <span id="digestTime" style="font-size:0.65rem; color:var(--muted);"></span>
+    </div>
+
+    <div class="digest-empty" id="digestEmpty">
+      <div class="icon">📭</div>
+      <p>No digest yet.<br>Click <strong style="color:var(--accent);">Run Now</strong> to fetch and summarize the latest news.</p>
+    </div>
+
+    <div class="digest-content" id="digestContent"></div>
+  </div>
+
+  <!-- Log Terminal -->
+  <div class="log-card">
+    <div class="log-header">
+      <div class="log-dot red"></div>
+      <div class="log-dot yellow"></div>
+      <div class="log-dot green"></div>
+      <span style="margin-left:8px;">Activity Log</span>
+    </div>
+    <div class="log-entries" id="logEntries">
+      <div class="log-entry">
+        <span class="log-time">--:--:--</span>
+        <span class="log-msg info">Dashboard initialized. Ready to run.</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let selectedRSS = 'https://feeds.bbci.co.uk/news/world/rss.xml';
+  let webhookURL = '';
+  let totalRuns = 0;
+
+  function saveWebhook() {
+    const val = document.getElementById('webhookInput').value.trim();
+    if (!val) return;
+    webhookURL = val;
+    document.getElementById('webhookUrlDisplay').textContent = val;
+    addLog('Webhook URL saved', 'success');
+  }
+
+  function selectSource(el, url) {
+    document.querySelectorAll('.source-item').forEach(i => {
+      i.classList.remove('active');
+      i.querySelector('.source-check').textContent = '';
+    });
+    el.classList.add('active');
+    el.querySelector('.source-check').textContent = '✓';
+    selectedRSS = url;
+    addLog(`RSS source changed to: ${el.querySelector('.source-name').textContent}`, 'info');
+  }
+
+  function addCustomRSS() {
+    const val = document.getElementById('customRss').value.trim();
+    if (!val) return;
+    const list = document.getElementById('sourceList');
+    const div = document.createElement('div');
+    div.className = 'source-item';
+    div.onclick = function() { selectSource(this, val); };
+    const name = val.replace('https://', '').split('/')[0];
+    div.innerHTML = `
+      <div>
+        <div class="source-name">Custom Feed</div>
+        <div class="source-url">${name}</div>
+      </div>
+      <div class="source-check"></div>
+    `;
+    list.appendChild(div);
+    selectSource(div, val);
+    document.getElementById('customRss').value = '';
+    addLog(`Custom RSS added: ${name}`, 'success');
+  }
+
+  function addLog(msg, type = 'info') {
+    const now = new Date();
+    const time = now.toTimeString().split(' ')[0];
+    const log = document.getElementById('logEntries');
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${type}">${msg}</span>`;
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function triggerWorkflow() {
+    const btn = document.getElementById('triggerBtn');
+
+    if (!webhookURL) {
+      addLog('No webhook URL set. Please configure your n8n webhook URL above.', 'error');
+      btn.textContent = '⚠ Set Webhook First';
+      btn.classList.add('error');
+      setTimeout(() => {
+        btn.textContent = '▶ Run Now';
+        btn.classList.remove('error');
+      }, 2500);
+      return;
+    }
+
+    btn.classList.add('loading');
+    btn.innerHTML = '<span class="spinner"></span>Running...';
+    addLog('Triggering n8n workflow...', 'info');
+    addLog(`Using RSS: ${selectedRSS}`, 'info');
+
+    try {
+      const response = await fetch(webhookURL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rss: selectedRSS, source: 'dashboard' })
+      });
+
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}));
+        btn.classList.remove('loading');
+        btn.classList.add('success');
+        btn.textContent = '✓ Sent to Telegram!';
+
+        totalRuns++;
+        document.getElementById('totalRuns').textContent = totalRuns;
+        document.getElementById('lastRun').textContent = new Date().toLocaleTimeString();
+
+        addLog('Workflow triggered successfully!', 'success');
+        addLog('News digest sent to Telegram.', 'success');
+
+        // Show digest if response has content
+        if (data.digest || data.text || data.content) {
+          showDigest(data.digest || data.text || data.content);
+        } else {
+          showDigest('✅ Workflow executed! Check your Telegram for the news digest.\n\nThe AI has fetched, summarized and delivered today\'s top stories.');
+        }
+
+        setTimeout(() => {
+          btn.classList.remove('success');
+          btn.textContent = '▶ Run Now';
+        }, 3000);
+
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+    } catch (err) {
+      btn.classList.remove('loading');
+      btn.classList.add('error');
+      btn.textContent = '✗ Failed';
+      addLog(`Error: ${err.message}`, 'error');
+      addLog('Check your webhook URL and make sure n8n is running.', 'warn');
+
+      setTimeout(() => {
+        btn.classList.remove('error');
+        btn.textContent = '▶ Run Now';
+      }, 3000);
+    }
+  }
+
+  function showDigest(text) {
+    const empty = document.getElementById('digestEmpty');
+    const content = document.getElementById('digestContent');
+    const timeEl = document.getElementById('digestTime');
+
+    empty.style.display = 'none';
+    content.classList.add('visible');
+    timeEl.textContent = new Date().toLocaleString();
+
+    // Parse lines into news items
+    const lines = text.split('\n').filter(l => l.trim());
+    content.innerHTML = '';
+
+    lines.forEach((line, i) => {
+      if (!line.trim()) return;
+      const div = document.createElement('div');
+      div.className = 'news-item';
+      div.style.animationDelay = `${i * 0.05}s`;
+
+      const clean = line.replace(/\*\*/g, '').replace(/\*/g, '');
+
+      if (line.startsWith('*') || line.startsWith('-') || line.startsWith('•')) {
+        div.innerHTML = `<p>${clean.replace(/^[\*\-•]\s*/, '')}</p>`;
+      } else if (line.includes('**') || line.length < 80) {
+        div.innerHTML = `<h4>${clean}</h4>`;
+      } else {
+        div.innerHTML = `<p>${clean}</p>`;
+      }
+      content.appendChild(div);
+    });
+
+    addLog('News digest displayed in dashboard.', 'success');
+  }
+</script>
+</body>
+</html>

@@ -1,12 +1,13 @@
-FROM n8nio/n8n
+FROM node:18-alpine
 
-EXPOSE 5678
+RUN npm install -g n8n
 
 ENV N8N_PORT=5678
 ENV N8N_PROTOCOL=https
 ENV N8N_HOST=0.0.0.0
-ENV WEBHOOK_URL=https://your-render-url.onrender.com
 ENV EXECUTIONS_PROCESS=main
 ENV N8N_ENCRYPTION_KEY=supersecretkey123
+
+EXPOSE 5678
 
 CMD ["n8n", "start"]
